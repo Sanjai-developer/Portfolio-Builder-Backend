@@ -1,43 +1,77 @@
+// E:\Portfolio\server\server.js
+
+require("dotenv").config();
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const socialRoutes = require("./routes/socialRoutes");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const githubRoutes = require("./routes/githubRoutes");
+
+const resumeRoutes = require("./routes/resumeRoutes");
 const errorHandler = require("./middleware/errorMiddleware");
-require("dotenv").config();
 const { logger } = require("./utils/logger");
 
-const app = express(); // Fix this import
-// Add test log
-// Body parser
-app.use(express.json());
+const app = express();
 
-// Security headers
+// ─────────────────────────────
+// 🌐 Middleware Setup
+// ─────────────────────────────
 app.use(helmet());
-
-// CORS configuration
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL||5173,
     credentials: true,
   })
 );
-
-// Body parser
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
+// ─────────────────────────────
+// 🔐 JWT Authentication
+// ─────────────────────────────
+const authMiddleware = (req, res, next) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
+  if (!token) {
+    logger.warn("No token provided");
+    return res.status(401).json({ message: "No token provided" });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    logger.info(`Authenticated user: ${decoded.id}`);
+    next();
+  } catch (err) {
+    logger.error(`Invalid token: ${err.message}`);
+    res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+// ─────────────────────────────
+// ⚙️ MongoDB Connection
+// ─────────────────────────────
 connectDB();
 
-// Routes
+// ─────────────────────────────
+// 📦 Routes
+// ─────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/github", githubRoutes);
 
-// Error handler
+app.use("/api/input", authMiddleware, resumeRoutes); // Upload handled in route
+app.use("/api/social", authMiddleware, socialRoutes);
+// ─────────────────────────────
+// ❌ Error Handler
+// ─────────────────────────────
 app.use(errorHandler);
 
-// Start server
+// ─────────────────────────────
+// 🚀 Start Server
+// ─────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-logger.info("Server started"); 
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
+});

@@ -17,7 +17,7 @@ const register = async (req, res, next) => {
     await user.save();
 
     const verificationToken = jwt.sign(
-      { userId: user._id },
+      { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -40,7 +40,7 @@ const verifyEmail = async (req, res, next) => {
   const { token } = req.body;
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.id);
     if (!user) throw new Error("User not found");
     if (user.isVerified) throw new Error("Email already verified");
 
@@ -64,14 +64,14 @@ const login = async (req, res, next) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new Error("Invalid credentials");
 
-    const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "15m",
+    const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
     });
     const refreshToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     await RefreshToken.create({
-      userId: user._id,
+      id: user._id,
       token: refreshToken,
       expiresAt,
     });
@@ -93,7 +93,7 @@ const refreshToken = async (req, res, next) => {
     if (!tokenDoc) throw new Error("Invalid or expired refresh token");
 
     const accessToken = jwt.sign(
-      { userId: tokenDoc.userId },
+      { id: tokenDoc.id },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
@@ -163,7 +163,7 @@ const logout = async (req, res, next) => {
 
 const getProfile = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId).select(
+    const user = await User.findById(req.user.id).select(
       "-password -otp -otpExpires"
     );
     if (!user) throw new Error("User not found");
